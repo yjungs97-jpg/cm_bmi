@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="ko" class="h-full bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PicFlow - Real-time Photo SNS</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'Noto Sans KR', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f5f3ff',
+                            100: '#ede9fe',
+                            500: '#8b5cf6',
+                            600: '#7c3aed',
+                            700: '#6d28d9',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Custom scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: #475569;
+        }
+        /* Custom animations */
+        @keyframes pop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.3); }
+            100% { transform: scale(1); }
+        }
+        .animate-pop {
+            animation: pop 0.3s ease-out;
+        }
+    </style>
+</head>
+<body class="h-full text-slate-800 dark:text-slate-100 flex flex-col antialiased">
+
+    <div id="app" class="flex flex-col h-full overflow-hidden max-w-md mx-auto w-full bg-white dark:bg-slate-950 shadow-2xl relative border-x border-slate-100 dark:border-slate-800">
+        
+        <!-- Welcome / Onboarding / Setup Profile Modal -->
+        <div id="onboarding-modal" class="hidden fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div class="bg-white dark:bg-slate-900 w-full max-w-sm rounded-2xl p-6 shadow-2xl border border-slate-100 dark:border-slate-800">
+                <div class="text-center mb-6">
+                    <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-tr from-violet-500 to-fuchsia-500 text-white text-2xl mb-3 shadow-lg">
+                        <i class="fa-solid fa-camera-retro"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-900 dark:text-white">프로필 설정</h3>
+                    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">PicFlow에서 사용할 정보를 입력해 주세요.</p>
+                </div>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">닉네임</label>
+                        <input type="text" id="username-input" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all font-medium" placeholder="닉네임을 입력해 주세요..." maxlength="15">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">아바타 선택</label>
+                        <div class="grid grid-cols-4 gap-3" id="avatar-grid">
+                            <!-- Populated dynamically with beautiful avatar SVGs or colors -->
+                        </div>
+                    </div>
+
+                    <button id="save-profile-btn" class="w-full mt-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-violet-500/25 active:scale-95 transition-all flex items-center justify-center gap-2">
+                        시작하기 <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Custom Notification Toast -->
+        <div id="toast" class="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-slate-900/95 dark:bg-slate-800/95 text-white px-4 py-2.5 rounded-xl text-sm font-medium shadow-xl flex items-center gap-2 transition-all duration-300 opacity-0 pointer-events-none scale-90">
+            <span id="toast-icon" class="text-brand-500"><i class="fa-solid fa-circle-info"></i></span>
+            <span id="toast-msg"></span>
+        </div>
+
+        <!-- Main Top Bar -->
+        <header class="flex-none px-4 py-3.5 border-b border-slate-100 dark:border-slate-900 flex items-center justify-between bg-white/80 dark:bg-slate-950/80 backdrop-blur-md sticky top-0 z-30">
+            <div class="flex items-center gap-2">
+                <span class="text-2xl bg-gradient-to-tr from-violet-600 via-fuchsia-500 to-pink-500 bg-clip-text text-transparent font-extrabold tracking-tight">PicFlow</span>
+                <span class="px-1.5 py-0.5 text-[9px] font-bold text-violet-600 bg-violet-100 dark:bg-violet-950/50 dark:text-violet-400 rounded-md">LIVE</span>
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <button id="theme-toggle" class="w-9 h-9 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900 rounded-xl transition-all">
+                    <i class="fa-solid fa-moon dark:hidden text-lg"></i>
+                    <i class="fa-solid fa-sun hidden dark:block text-lg"></i>
+                </button>
+                <div class="h-4 w-px bg-slate-200 dark:bg-slate-800"></div>
+                <!-- Current Profile Avatar Display -->
+                <button id="header-profile-btn" class="flex items-center gap-1.5 hover:opacity-85 transition-opacity">
+                    <div id="current-user-avatar" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center overflow-hidden border border-brand-500/20">
+                        <!-- User avatar will go here -->
+                    </div>
+                </button>
+            </div>
+        </header>
+
+        <main class="flex-1 overflow-y-auto bg-slate-50/50 dark:bg-slate-950/50 relative">
+            
+            <!-- VIEW: Feed -->
+            <div id="view-feed" class="view-panel space-y-4 py-4 px-4 pb-20">
+                <!-- User Status / Online Bar -->
+                <div class="bg-white dark:bg-slate-900/60 backdrop-blur rounded-2xl p-3 border border-slate-100 dark:border-slate-900 flex flex-col gap-2">
+                    <div class="flex items-center justify-between text-xs font-semibold text-slate-400 uppercase tracking-wide px-1">
+                        <span>현재 접속한 멤버들</span>
+                        <span id="active-user-count" class="text-brand-500">0명</span>
+                    </div>
+                    <div id="active-users-list" class="flex items-center gap-3 overflow-x-auto py-1.5 no-scrollbar">
+                        <!-- Populated with online users -->
+                    </div>
+                </div>
+
+                <!-- Feed Content Dynamic Loading Area -->
+                <div id="feed-posts-container" class="space-y-4">
+                    <!-- Loading Skeleton / Shimmers -->
+                    <div id="feed-shimmer" class="space-y-4">
+                        <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 space-y-3 animate-pulse">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-800"></div>
+                                <div class="space-y-2 flex-1">
+                                    <div class="h-4 bg-slate-200 dark:bg-slate-800 rounded w-1/3"></div>
+                                    <div class="h-3 bg-slate-200 dark:bg-slate-800 rounded w-1/4"></div>
+                                </div>
+                            </div>
+                            <div class="h-56 bg-slate-200 dark:bg-slate-800 rounded-xl"></div>
+                            <div class="h-4 bg-slate-200 dark:bg-slate-800 rounded w-3/4"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: Create Post -->
+            <div id="view-create" class="view-panel hidden p-4 pb-20 space-y-4">
+                <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-100 dark:border-slate-900 space-y-4">
+                    <h2 class="text-lg font-bold text-slate-900 dark:text-white">새 포스트 작성</h2>
+                    
+                    <!-- Tab options for photo selection -->
+                    <div class="flex rounded-lg bg-slate-100 dark:bg-slate-800 p-1">
+                        <button id="btn-tab-curated" class="flex-1 text-center py-1.5 text-xs font-semibold rounded-md bg-white dark:bg-slate-700 shadow-sm text-slate-800 dark:text-white transition-all">큐레이션 이미지</button>
+                        <button id="btn-tab-url" class="flex-1 text-center py-1.5 text-xs font-semibold rounded-md text-slate-500 dark:text-slate-400 transition-all">커스텀 URL</button>
+                    </div>
+
+                    <!-- Curated Stock Images selection -->
+                    <div id="curated-container" class="space-y-3">
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">마음에 드는 사진 선택</label>
+                        <div class="grid grid-cols-3 gap-2" id="curated-stock-grid">
+                            <!-- Curated stock options will be rendered here -->
+                        </div>
+                    </div>
+
+                    <!-- Custom URL input -->
+                    <div id="custom-url-container" class="space-y-2 hidden">
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">이미지 주소 (URL)</label>
+                        <input type="url" id="custom-image-url" class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all" placeholder="https://images.unsplash.com/photo-...">
+                    </div>
+
+                    <!-- Image Preview Area -->
+                    <div id="image-preview-wrapper" class="aspect-[4/3] rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-950 border border-dashed border-slate-300 dark:border-slate-800 relative flex items-center justify-center">
+                        <img id="image-preview" src="" class="w-full h-full object-cover hidden" alt="선택한 이미지 미리보기" onerror="handleImageError(this)">
+                        <div id="image-preview-placeholder" class="text-center text-slate-400 p-4">
+                            <i class="fa-regular fa-image text-3xl mb-2"></i>
+                            <p class="text-xs">상단의 큐레이션 혹은 URL을 통해 이미지를 선택해주세요.</p>
+                        </div>
+                    </div>
+
+                    <!-- Caption/Description input -->
+                    <div class="space-y-2">
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">캡션 (설명)</label>
+                        <textarea id="post-caption" rows="3" class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all resize-none" placeholder="이 사진에 대한 재미있는 에피소드를 남겨보세요..."></textarea>
+                    </div>
+
+                    <button id="publish-post-btn" class="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-violet-500/20 hover:from-violet-700 hover:to-fuchsia-700 transition-all flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-paper-plane"></i> 피드에 게시하기
+                    </button>
+                </div>
+            </div>
+
+            <!-- VIEW: My Profile -->
+            <div id="view-profile" class="view-panel hidden p-4 pb-20 space-y-4">
+                <!-- Main user card -->
+                <div class="bg-gradient-to-tr from-slate-900 via-violet-950 to-indigo-950 text-white rounded-3xl p-6 shadow-xl relative overflow-hidden">
+                    <div class="absolute -right-10 -bottom-10 w-40 h-40 bg-fuchsia-500/10 rounded-full blur-2xl"></div>
+                    <div class="relative z-10 flex flex-col items-center text-center">
+                        <div id="profile-card-avatar" class="w-20 h-20 rounded-full border-4 border-white/20 bg-slate-800 overflow-hidden flex items-center justify-center shadow-lg">
+                            <!-- Avatar will go here -->
+                        </div>
+                        <h2 id="profile-card-name" class="text-xl font-bold mt-3">닉네임</h2>
+                        <p id="profile-card-uid" class="text-[10px] text-violet-300 font-mono select-all bg-white/10 px-2 py-1 rounded-md mt-1.5 opacity-80 cursor-pointer" title="클릭해서 복사"></p>
+                        
+                        <!-- Mini Stats Grid -->
+                        <div class="grid grid-cols-2 gap-8 w-full mt-6 pt-5 border-t border-white/10">
+                            <div>
+                                <span class="block text-xs text-violet-200/70 uppercase font-semibold">내 포스트</span>
+                                <span id="profile-stat-posts" class="text-xl font-extrabold mt-1 block">0</span>
+                            </div>
+                            <div>
+                                <span class="block text-xs text-violet-200/70 uppercase font-semibold">받은 좋아요</span>
+                                <span id="profile-stat-likes" class="text-xl font-extrabold mt-1 block">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Personal Profile Settings Editor -->
+                <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-100 dark:border-slate-900 space-y-4">
+                    <h3 class="text-md font-bold text-slate-900 dark:text-white">프로필 편집</h3>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">새로운 닉네임</label>
+                            <input type="text" id="edit-username-input" class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all" placeholder="닉네임 입력">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">아바타 다시 선택</label>
+                            <div class="grid grid-cols-4 gap-3" id="edit-avatar-grid">
+                                <!-- Re-used avatar list -->
+                            </div>
+                        </div>
+                        <button id="update-profile-btn" class="w-full bg-slate-900 dark:bg-slate-800 text-white font-bold py-3 rounded-xl hover:bg-slate-800 dark:hover:bg-slate-700 transition-all flex items-center justify-center gap-2">
+                            프로필 저장하기
+                        </button>
+                    </div>
+                </div>
+
+                <!-- My Posts list preview -->
+                <div class="space-y-2">
+                    <h3 class="text-md font-bold text-slate-900 dark:text-white px-1">내가 작성한 포스트</h3>
+                    <div id="my-posts-grid" class="grid grid-cols-2 gap-2">
+                        <!-- Tiny visual grid items -->
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Drawer Panel for Post Comments -->
+        <div id="comments-drawer" class="hidden absolute inset-0 z-40 bg-slate-900/60 backdrop-blur-xs flex flex-col justify-end">
+            <!-- Backdrop Click Area -->
+            <div class="flex-1" onclick="closeCommentsDrawer()"></div>
+            <!-- Drawer Body -->
+            <div class="bg-white dark:bg-slate-950 rounded-t-[2.5rem] border-t border-slate-100 dark:border-slate-900 max-h-[75%] flex flex-col shadow-2xl animate-slide-up relative">
+                <!-- Decorative Notch -->
+                <div class="w-12 h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full mx-auto my-3 cursor-pointer" onclick="closeCommentsDrawer()"></div>
+                
+                <div class="px-5 pb-3 flex items-center justify-between border-b border-slate-100 dark:border-slate-900">
+                    <h3 class="text-lg font-bold text-slate-900 dark:text-white">댓글 <span id="drawer-comment-count" class="text-brand-500 font-extrabold ml-1">0</span></h3>
+                    <button class="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-900 flex items-center justify-center text-slate-500" onclick="closeCommentsDrawer()">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                <!-- Comments List -->
+                <div id="drawer-comments-list" class="flex-1 overflow-y-auto p-5 space-y-4">
+                    <!-- Dynamic comments list here -->
+                </div>
+
+                <!-- New Comment Input Box -->
+                <div class="p-4 border-t border-slate-100 dark:border-slate-900 bg-slate-50 dark:bg-slate-950 sticky bottom-0">
+                    <form id="comment-form" onsubmit="event.preventDefault(); submitComment();" class="flex items-center gap-2">
+                        <input type="text" id="comment-input" class="flex-1 px-4 py-3 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="댓글을 입력해보세요..." maxlength="100">
+                        <button type="submit" class="bg-brand-500 text-white px-4 py-3 rounded-xl font-bold hover:bg-brand-600 transition-colors flex items-center justify-center">
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fixed Tab Bottom Navigation Bar -->
+        <nav class="flex-none bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border-t border-slate-100 dark:border-slate-900 py-2 px-6 flex items-center justify-between sticky bottom-0 z-30">
+            <button id="nav-btn-feed" class="flex flex-col items-center gap-1 group py-1 flex-1 text-brand-500">
+                <i class="fa-solid fa-house text-lg group-hover:scale-110 transition-transform"></i>
+                <span class="text-[10px] font-bold">홈</span>
+            </button>
+            
+            <button id="nav-btn-create" class="flex flex-col items-center gap-1 group py-1 flex-1 text-slate-400 dark:text-slate-500 hover:text-brand-500 dark:hover:text-brand-400">
+                <div class="w-10 h-10 -mt-5 bg-gradient-to-tr from-brand-500 to-fuchsia-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-brand-500/25 group-hover:scale-105 group-hover:rotate-90 transition-all">
+                    <i class="fa-solid fa-plus text-lg"></i>
+                </div>
+            </button>
+
+            <button id="nav-btn-profile" class="flex flex-col items-center gap-1 group py-1 flex-1 text-slate-400 dark:text-slate-500 hover:text-brand-500 dark:hover:text-brand-400">
+                <i class="fa-regular fa-user text-lg group-hover:scale-110 transition-transform"></i>
+                <span class="text-[10px] font-semibold">내프로필</span>
+            </button>
+        </nav>
+
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, query, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global / Safe Environment Setup
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'picflow-sns-app';
+        let firebaseConfigObj = null;
+        let db = null;
+        let auth = null;
+        let isFirebaseAvailable = false;
+
+        // Try parsing Firebase Config safely
+        try {
+            if (typeof __firebase_config !== 'undefined') {
+                firebaseConfigObj = JSON.parse(__firebase_config);
+            }
+        } catch (e) {
+            console.error("Failed to parse Firebase configuration:", e);
+        }
+
+        // Active State
+        let currentUser = null;
+        let userProfileData = null;
+        let allPosts = [];
+        let allProfiles = {};
+        let activeUsers = [];
+        let currentEditingPostId = null; // tracking which post comments list is viewing
+
+        // Preset Avatars as SVG Gradients
+        const avatars = [
+            { id: 'av1', bg: 'from-pink-500 to-rose-500', emoji: '🐱' },
+            { id: 'av2', bg: 'from-purple-500 to-indigo-500', emoji: '🦊' },
+            { id: 'av3', bg: 'from-amber-400 to-orange-500', emoji: '🐨' },
+            { id: 'av4', bg: 'from-teal-400 to-emerald-500', emoji: '🐼' },
+            { id: 'av5', bg: 'from-cyan-500 to-blue-600', emoji: '🦄' },
+            { id: 'av6', bg: 'from-violet-600 to-fuchsia-600', emoji: '🦊' },
+            { id: 'av7', bg: 'from-yellow-400 to-amber-500', emoji: '🐥' },
+            { id: 'av8', bg: 'from-emerald-400 to-teal-500', emoji: '🐸' }
+        ];
+
+        // Curated Stock Photos (Unsplash URLs to start with, high quality & optimized)
+        const stockPhotos = [
+            "https://images.unsplash.com/photo-1501854140801-50d01698950b?auto=format&fit=crop&w=600&q=80",
+            "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=600&q=80",
+            "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=600&q=80",
+            "https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?auto=format&fit=crop&w=600&q=80",
+            "https://images.unsplash.com/photo-1472214222541-d510753a4707?auto=format&fit=crop&w=600&q=80",
+            "https://images.unsplash.com/photo-1525253086316-d0c936c814f8?auto=format&fit=crop&w=600&q=80"
+        ];
+        let selectedImageUrl = stockPhotos[0];
+
+        // UI Helpers
+        function showToast(message, iconClass = "fa-solid fa-circle-info") {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toast-icon');
+            const msg = document.getElementById('toast-msg');
+            
+            icon.className = iconClass;
+            msg.textContent = message;
+            
+            toast.className = toast.className.replace('opacity-0 pointer-events-none scale-90', 'opacity-100 pointer-events-auto scale-100');
+            setTimeout(() => {
+                toast.className = toast.className.replace('opacity-100 pointer-events-auto scale-100', 'opacity-0 pointer-events-none scale-90');
+            }, 3000);
+        }
+
+        // Toggle Dark Mode
+        const themeToggleBtn = document.getElementById('theme-toggle');
+        themeToggleBtn.addEventListener('click', () => {
+            document.documentElement.classList.toggle('dark');
+        });
+
+        // Copy Text Function
+        window.copyUidToClipboard = function(uidText) {
+            const dummy = document.createElement("textarea");
+            document.body.appendChild(dummy);
+            dummy.value = uidText;
+            dummy.select();
+            document.execCommand('copy');
+            document.body.removeChild(dummy);
+            showToast("사용자 ID가 복사되었습니다!", "fa-solid fa-clipboard-check text-emerald-500");
+        };
+
+        // Initialize Firebase
+        async function setupApp() {
+            if (firebaseConfigObj) {
+                try {
+                    const app = initializeApp(firebaseConfigObj);
+                    db = getFirestore(app);
+                    auth = getAuth(app);
+                    isFirebaseAvailable = true;
+                    
+                    // Prioritize Custom Token or fallback Anonymously
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                } catch (e) {
+                    console.error("Firebase init failed, switching to Mock Data Mode:", e);
+                    isFirebaseAvailable = false;
+                    setupMockEnvironment();
+                }
+            } else {
+                console.log("No Firebase config detected, running with Mock Data...");
+                setupMockEnvironment();
+            }
+
+            if (isFirebaseAvailable) {
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        currentUser = user;
+                        await checkAndLoadProfile();
+                    }
+                });
+            }
+        }
+
+        // Mock fallback database
+        const mockDatabase = {
+            profiles: {},
+            posts: []
+        };
+
+        function setupMockEnvironment() {
+            // Generate temporary user
+            currentUser = {
+                uid: 'mock-user-' + Math.random().toString(36).substr(2, 9)
+            };
+            
+            // Hydrate with some default mock posts
+            mockDatabase.posts = [
+                {
+                    id: 'post-1',
+                    userId: 'user-lucas',
+                    imageUrl: 'https://images.unsplash.com/photo-1501854140801-50d01698950b?auto=format&fit=crop&w=600&q=80',
+                    caption: '오랜만에 주말 힐링! 숲속 공기가 상쾌하고 너무 좋네요 🌳✨',
+                    likes: ['mock-user-1', 'mock-user-2'],
+                    comments: [
+                        { userId: 'mock-user-1', displayName: '지우', avatarId: 'av1', text: '와 경치 진짜 멋지네요!!', createdAt: Date.now() - 3600000 },
+                        { userId: 'mock-user-2', displayName: '민혁', avatarId: 'av4', text: '부럽습니다... 힐링하고 오셔요 ㅎㅎ', createdAt: Date.now() - 1800000 }
+                    ],
+                    createdAt: Date.now() - 7200000
+                },
+                {
+                    id: 'post-2',
+                    userId: 'user-amy',
+                    imageUrl: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=600&q=80',
+                    caption: '아름다운 안개 낀 아침 산책길 🌅 다들 좋은 하루 보내세요!',
+                    likes: [],
+                    comments: [],
+                    createdAt: Date.now() - 14400000
+                }
+            ];
+
+            mockDatabase.profiles['user-lucas'] = {
+                displayName: '루카스',
+                avatarId: 'av6'
+            };
+            mockDatabase.profiles['user-amy'] = {
+                displayName: '에이미',
+                avatarId: 'av2'
+            };
+
+            // Trigger onboarding/setup profile modal
+            checkAndLoadProfile();
+        }
+
+        // Check if Profile exists
+        async function checkAndLoadProfile() {
+            if (isFirebaseAvailable) {
+                const profileRef = doc(db, 'artifacts', appId, 'public', 'data', 'profiles', currentUser.uid);
+                try {
+                    const docSnap = await getDoc(profileRef);
+                    if (docSnap.exists()) {
+                        userProfileData = docSnap.data();
+                        onboardingCompleted();
+                    } else {
+                        // User needs to set up a profile
+                        openOnboardingModal();
+                    }
+                } catch (e) {
+                    console.error("Profile check failed:", e);
+                    openOnboardingModal();
+                }
+            } else {
+                // Mock profile fallback
+                const profile = mockDatabase.profiles[currentUser.uid];
+                if (profile) {
+                    userProfileData = profile;
+                    onboardingCompleted();
+                } else {
+                    openOnboardingModal();
+                }
+            }
+        }
+
+        // Profile Set / Selection Functions
+        let selectedAvatarId = 'av1';
+
+        function renderAvatarSelector(gridId, currentSelectionId) {
+            const grid = document.getElementById(gridId);
+            grid.innerHTML = '';
+            avatars.forEach(av => {
+                const isSelected = av.id === currentSelectionId;
+                const btn = document.createElement('button');
+                btn.className = `aspect-square rounded-2xl bg-gradient-to-tr ${av.bg} flex items-center justify-center text-2xl border-4 transition-all hover:scale-105 active:scale-95 ${isSelected ? 'border-brand-500 shadow-md ring-4 ring-brand-100 dark:ring-brand-950/40' : 'border-transparent'}`;
+                btn.type = 'button';
+                btn.innerHTML = av.emoji;
+                btn.addEventListener('click', () => {
+                    selectedAvatarId = av.id;
+                    renderAvatarSelector(gridId, av.id);
+                });
+                grid.appendChild(btn);
+            });
+        }
+
+        function openOnboardingModal() {
+            const modal = document.getElementById('onboarding-modal');
+            modal.classList.remove('hidden');
+            renderAvatarSelector('avatar-grid', selectedAvatarId);
+        }
+
+        document.getElementById('save-profile-btn').addEventListener('click', async () => {
+            const nickname = document.getElementById('username-input').value.trim();
+            if (!nickname) {
+                showToast("닉네임을 입력해주세요!", "fa-solid fa-triangle-exclamation text-rose-500");
+                return;
+            }
+
+            const profileObj = {
+                displayName: nickname,
+                avatarId: selectedAvatarId,
+                updatedAt: Date.now()
+            };
+
+            if (isFirebaseAvailable) {
+                const profileRef = doc(db, 'artifacts', appId, 'public', 'data', 'profiles', currentUser.uid);
+                await setDoc(profileRef, profileObj);
+            } else {
+                mockDatabase.profiles[currentUser.uid] = profileObj;
+            }
+
+            userProfileData = profileObj;
+            document.getElementById('onboarding-modal').classList.add('hidden');
+            onboardingCompleted();
+            showToast("환영합니다! 프로필 작성이 완료되었습니다.", "fa-solid fa-circle-check text-emerald-500");
+        });
+
+        // Once onboarding complete, initialize real-time subscriptions
+        function onboardingCompleted() {
+            // Update Header profile picture
+            const headerAvatarContainer = document.getElementById('current-user-avatar');
+            const selectedAvatar = avatars.find(a => a.id === userProfileData.avatarId) || avatars[0];
+            headerAvatarContainer.className = `w-8 h-8 rounded-full bg-gradient-to-tr ${selectedAvatar.bg} flex items-center justify-center overflow-hidden text-lg border border-brand-500/20`;
+            headerAvatarContainer.innerHTML = selectedAvatar.emoji;
+
+            // Load profiles & feeds
+            subscribeToDatabase();
+            initProfileEditor();
+        }
+
+        function subscribeToDatabase() {
+            if (isFirebaseAvailable) {
+                // Subscribe to All Profiles
+                const profilesQuery = collection(db, 'artifacts', appId, 'public', 'data', 'profiles');
+                onSnapshot(profilesQuery, (snapshot) => {
+                    allProfiles = {};
+                    snapshot.forEach(doc => {
+                        allProfiles[doc.id] = doc.data();
+                    });
+                    renderActiveUsers();
+                    renderFeed();
+                }, (error) => {
+                    console.error("Profiles subscription error:", error);
+                });
+
+                // Subscribe to Posts
+                const postsQuery = collection(db, 'artifacts', appId, 'public', 'data', 'posts');
+                onSnapshot(postsQuery, (snapshot) => {
+                    allPosts = [];
+                    snapshot.forEach(docSnap => {
+                        const post = docSnap.data();
+                        post.id = docSnap.id;
+                        allPosts.push(post);
+                    });
+                    // Sort by createdAt desc in memory (Firestore Rule 2: No complex queries)
+                    allPosts.sort((a, b) => b.createdAt - a.createdAt);
+                    
+                    renderFeed();
+                    renderMyProfilePage();
+                }, (error) => {
+                    console.error("Posts subscription error:", error);
+                });
+            } else {
+                // Mock system trigger initial renders
+                allProfiles = mockDatabase.profiles;
+                allPosts = [...mockDatabase.posts].sort((a, b) => b.createdAt - a.createdAt);
+                
+                renderActiveUsers();
+                renderFeed();
+                renderMyProfilePage();
+            }
+        }
+
+        const views = {
+            feed: document.getElementById('view-feed'),
+            create: document.getElementById('view-create'),
+            profile: document.getElementById('view-profile')
+        };
+
+        const navBtns = {
+            feed: document.getElementById('nav-btn-feed'),
+            create: document.getElementById('nav-btn-create'),
+            profile: document.getElementById('nav-btn-profile')
+        };
+
+        function switchView(target) {
+            Object.keys(views).forEach(key => {
+                if (key === target) {
+                    views[key].classList.remove('hidden');
+                } else {
+                    views[key].classList.add('hidden');
+                }
+            });
+
+            // Handle nav bar colors
+            Object.keys(navBtns).forEach(key => {
+                if (key === target) {
+                    if (key === 'create') {
+                        // Keep specialized styling
+                    } else {
+                        navBtns[key].className = "flex flex-col items-center gap-1 group py-1 flex-1 text-brand-500";
+                        const icon = navBtns[key].querySelector('i');
+                        if (icon) icon.className = icon.className.replace('fa-regular', 'fa-solid');
+                    }
+                } else {
+                    if (key === 'create') {
+                        // Keep specialized styling
+                    } else {
+                        navBtns[key].className = "flex flex-col items-center gap-1 group py-1 flex-1 text-slate-400 dark:text-slate-500 hover:text-brand-500 dark:hover:text-brand-400";
+                        const icon = navBtns[key].querySelector('i');
+                        if (icon) icon.className = icon.className.replace('fa-solid', 'fa-regular');
+                    }
+                }
+            });
+            
+            // Side Effects
+            if (target === 'profile') {
+                renderMyProfilePage();
+            } else if (target === 'create') {
+                initCreatePostForm();
+            }
+        }
+
+        navBtns.feed.addEventListener('click', () => switchView('feed'));
+        navBtns.create.addEventListener('click', () => switchView('create'));
+        navBtns.profile.addEventListener('click', () => switchView('profile'));
+        document.getElementById('header-profile-btn').addEventListener('click', () => switchView('profile'));
+
+        // Active Users online roster
+        function renderActiveUsers() {
+            const listContainer = document.getElementById('active-users-list');
+            const countContainer = document.getElementById('active-user-count');
+            
+            listContainer.innerHTML = '';
+            
+            // Build temporary or permanent users list
+            const uniqueUsers = {};
+            // Include default authors if any
+            Object.keys(allProfiles).forEach(id => {
+                uniqueUsers[id] = allProfiles[id];
+            });
+            // Ensure current user is in
+            if (currentUser && userProfileData) {
+                uniqueUsers[currentUser.uid] = userProfileData;
+            }
+
+            const users = Object.keys(uniqueUsers).map(id => ({
+                id,
+                ...uniqueUsers[id]
+            }));
+
+            countContainer.textContent = `${users.length}명`;
+
+            users.forEach(u => {
+                const av = avatars.find(a => a.id === u.avatarId) || avatars[0];
+                const activeWrapper = document.createElement('div');
+                activeWrapper.className = "flex flex-col items-center flex-shrink-0 cursor-pointer group";
+                activeWrapper.title = `유저 ID: ${u.id}`;
+                
+                // Copy user UID on clicking their bubble
+                activeWrapper.addEventListener('click', () => {
+                    window.copyUidToClipboard(u.id);
+                });
+
+                activeWrapper.innerHTML = `
+                    <div class="relative">
+                        <div class="w-12 h-12 rounded-full bg-gradient-to-tr ${av.bg} flex items-center justify-center text-2xl shadow-md border-2 border-white dark:border-slate-900 group-hover:scale-105 transition-transform duration-200">
+                            ${av.emoji}
+                        </div>
+                        <span class="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-white dark:border-slate-900 shadow-sm"></span>
+                    </div>
+                    <span class="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-1.5 max-w-[50px] truncate">${u.displayName}</span>
+                `;
+                listContainer.appendChild(activeWrapper);
+            });
+        }
+
+        // Renders Feed Cards
+        function renderFeed() {
+            const container = document.getElementById('feed-posts-container');
+            
+            // Hide skeleton
+            const shimmer = document.getElementById('feed-shimmer');
+            if (shimmer) shimmer.classList.add('hidden');
+
+            if (allPosts.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-16 text-slate-400 space-y-2 bg-white dark:bg-slate-900/40 rounded-3xl p-6 border border-dashed border-slate-200 dark:border-slate-800">
+                        <i class="fa-regular fa-folder-open text-4xl mb-2 text-slate-300 dark:text-slate-700"></i>
+                        <h4 class="font-bold text-slate-600 dark:text-slate-400">등록된 사진이 없습니다</h4>
+                        <p class="text-xs">첫 번째 아름다운 순간을 직접 피드에 공유해 보세요!</p>
+                        <button onclick="switchView('create')" class="inline-flex items-center gap-1.5 mt-4 bg-brand-500 hover:bg-brand-600 text-white text-xs font-bold py-2 px-4 rounded-xl shadow-md">
+                            사진 올리기 <i class="fa-solid fa-plus"></i>
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = '';
+
+            allPosts.forEach(post => {
+                const author = allProfiles[post.userId] || { displayName: '익명 크루', avatarId: 'av1' };
+                const authorAv = avatars.find(a => a.id === author.avatarId) || avatars[0];
+                const hasLiked = post.likes ? post.likes.includes(currentUser?.uid) : false;
+                
+                const timeStr = formatTime(post.createdAt);
+                const commentsCount = post.comments ? post.comments.length : 0;
+                const likesCount = post.likes ? post.likes.length : 0;
+
+                const card = document.createElement('article');
+                card.className = "bg-white dark:bg-slate-900 rounded-3xl overflow-hidden border border-slate-100 dark:border-slate-900 shadow-md shadow-slate-200/50 dark:shadow-none hover:shadow-lg transition-shadow duration-300";
+                
+                card.innerHTML = `
+                    <!-- Post Header -->
+                    <div class="p-4 flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-gradient-to-tr ${authorAv.bg} flex items-center justify-center text-xl shadow-inner cursor-pointer" onclick="window.copyUidToClipboard('${post.userId}')" title="유저 ID 복사">
+                                ${authorAv.emoji}
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-sm text-slate-900 dark:text-white cursor-pointer hover:underline" onclick="window.copyUidToClipboard('${post.userId}')">${author.displayName}</h4>
+                                <span class="text-[10px] text-slate-400 dark:text-slate-500 font-medium">${timeStr}</span>
+                            </div>
+                        </div>
+                        <button class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-full hover:bg-slate-50 dark:hover:bg-slate-800" onclick="window.copyUidToClipboard('${post.id}')" title="포스트 ID 복사">
+                            <i class="fa-solid fa-ellipsis"></i>
+                        </button>
+                    </div>
+
+                    <!-- Post Photo -->
+                    <div class="relative aspect-[4/3] bg-slate-100 dark:bg-slate-950 overflow-hidden cursor-pointer group" onclick="toggleLike('${post.id}')">
+                        <img src="${post.imageUrl}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" alt="SNS Post" onerror="this.onerror=null; this.src='https://placehold.co/600x400/eeeeee/333333?text=Image+Load+Error';">
+                        <!-- Dual tap / Double click heart overlay effect -->
+                        <div class="absolute inset-0 flex items-center justify-center opacity-0 hover:bg-black/5 transition-all">
+                            <span class="text-white text-5xl drop-shadow-lg transform scale-50 group-active:scale-100 transition-transform"><i class="fa-solid fa-heart"></i></span>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons and Likes -->
+                    <div class="p-4 space-y-2.5">
+                        <div class="flex items-center gap-4">
+                            <!-- Like Button -->
+                            <button class="flex items-center gap-1.5 text-slate-600 dark:text-slate-300 hover:text-rose-500 transition-colors focus:outline-none" onclick="toggleLike('${post.id}')">
+                                <i class="${hasLiked ? 'fa-solid fa-heart text-rose-500 animate-pop' : 'fa-regular fa-heart'} text-xl"></i>
+                                <span class="text-xs font-bold">${likesCount}</span>
+                            </button>
+                            <!-- Comment Button -->
+                            <button class="flex items-center gap-1.5 text-slate-600 dark:text-slate-300 hover:text-brand-500 transition-colors focus:outline-none" onclick="openCommentsDrawer('${post.id}')">
+                                <i class="fa-regular fa-comment text-xl"></i>
+                                <span class="text-xs font-bold">${commentsCount}</span>
+                            </button>
+                        </div>
+
+                        <!-- Caption -->
+                        <p class="text-sm leading-relaxed text-slate-800 dark:text-slate-200">
+                            <span class="font-bold mr-1.5 text-slate-900 dark:text-white">${author.displayName}</span>
+                            ${post.caption || ''}
+                        </p>
+
+                        <!-- Highlight Comments Display -->
+                        ${commentsCount > 0 ? `
+                            <div class="pt-2 border-t border-slate-50 dark:border-slate-800/50 space-y-1">
+                                <button onclick="openCommentsDrawer('${post.id}')" class="text-xs font-semibold text-slate-400 dark:text-slate-500 hover:text-brand-500 transition-colors mb-1">댓글 ${commentsCount}개 모두 보기...</button>
+                                <div class="space-y-1">
+                                    ${post.comments.slice(-2).map(comment => {
+                                        const cAuthor = allProfiles[comment.userId] || { displayName: comment.displayName || '익명' };
+                                        return `
+                                            <p class="text-xs leading-normal">
+                                                <span class="font-semibold text-slate-800 dark:text-slate-300 mr-1.5">${cAuthor.displayName}</span>
+                                                <span class="text-slate-600 dark:text-slate-400">${comment.text}</span>
+                                            </p>
+                                        `;
+                                    }).join('')}
+                                </div>
+                            </div>
+                        ` : `
+                            <button onclick="openCommentsDrawer('${post.id}')" class="text-xs font-medium text-slate-400 dark:text-slate-500 hover:text-brand-500 transition-colors">가장 먼저 댓글을 달아보세요!</button>
+                        `}
+                    </div>
+                `;
+
+                container.appendChild(card);
+            });
+        }
+
+        function formatTime(timestamp) {
+            const now = Date.now();
+            const diff = now - timestamp;
+            const minutes = Math.floor(diff / 60000);
+            const hours = Math.floor(minutes / 60);
+            const days = Math.floor(hours / 24);
+
+            if (minutes < 1) return '방금 전';
+            if (minutes < 60) return `${minutes}분 전`;
+            if (hours < 24) return `${hours}시간 전`;
+            if (days < 7) return `${days}일 전`;
+            
+            const date = new Date(timestamp);
+            return `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일`;
+        }
+
+        // Create Post Tab Setup
+        function initCreatePostForm() {
+            const grid = document.getElementById('curated-stock-grid');
+            grid.innerHTML = '';
+            
+            // Render curated stock selections
+            stockPhotos.forEach((url, idx) => {
+                const btn = document.createElement('button');
+                btn.className = `aspect-video rounded-lg overflow-hidden border-2 transition-all hover:scale-[1.02] active:scale-95 relative ${selectedImageUrl === url ? 'border-brand-500 ring-2 ring-brand-100' : 'border-transparent'}`;
+                btn.innerHTML = `<img src="${url}" class="w-full h-full object-cover" alt="Stock Photo Option">`;
+                btn.type = 'button';
+                btn.addEventListener('click', () => {
+                    selectedImageUrl = url;
+                    updatePostImagePreview(url);
+                    initCreatePostForm(); // re-render layout highlight
+                });
+                grid.appendChild(btn);
+            });
+
+            // Set default caption empty
+            document.getElementById('post-caption').value = '';
+            updatePostImagePreview(selectedImageUrl);
+        }
+
+        // Custom URL & stock toggling tabs
+        const btnTabCurated = document.getElementById('btn-tab-curated');
+        const btnTabUrl = document.getElementById('btn-tab-url');
+        const curatedContainer = document.getElementById('curated-container');
+        const customUrlContainer = document.getElementById('custom-url-container');
+        const customImageUrlInput = document.getElementById('custom-image-url');
+
+        btnTabCurated.addEventListener('click', () => {
+            btnTabCurated.className = "flex-1 text-center py-1.5 text-xs font-semibold rounded-md bg-white dark:bg-slate-700 shadow-sm text-slate-800 dark:text-white transition-all";
+            btnTabUrl.className = "flex-1 text-center py-1.5 text-xs font-semibold rounded-md text-slate-500 dark:text-slate-400 transition-all";
+            curatedContainer.classList.remove('hidden');
+            customUrlContainer.classList.add('hidden');
+            selectedImageUrl = stockPhotos[0];
+            updatePostImagePreview(selectedImageUrl);
+        });
+
+        btnTabUrl.addEventListener('click', () => {
+            btnTabUrl.className = "flex-1 text-center py-1.5 text-xs font-semibold rounded-md bg-white dark:bg-slate-700 shadow-sm text-slate-800 dark:text-white transition-all";
+            btnTabCurated.className = "flex-1 text-center py-1.5 text-xs font-semibold rounded-md text-slate-500 dark:text-slate-400 transition-all";
+            curatedContainer.classList.add('hidden');
+            customUrlContainer.classList.remove('hidden');
+            updatePostImagePreview(customImageUrlInput.value || '');
+        });
+
+        customImageUrlInput.addEventListener('input', (e) => {
+            selectedImageUrl = e.target.value.trim();
+            updatePostImagePreview(selectedImageUrl);
+        });
+
+        function updatePostImagePreview(url) {
+            const previewImg = document.getElementById('image-preview');
+            const placeholder = document.getElementById('image-preview-placeholder');
+
+            if (url) {
+                previewImg.src = url;
+                previewImg.classList.remove('hidden');
+                placeholder.classList.add('hidden');
+            } else {
+                previewImg.classList.add('hidden');
+                placeholder.classList.remove('hidden');
+            }
+        }
+
+        window.handleImageError = function(img) {
+            img.src = 'https://placehold.co/600x400/eeeeee/333333?text=Invalid+Image+URL';
+        };
+
+        // Publish Post Trigger
+        document.getElementById('publish-post-btn').addEventListener('click', async () => {
+            const caption = document.getElementById('post-caption').value.trim();
+            
+            if (!selectedImageUrl) {
+                showToast("이미지를 선택하거나 올바른 URL을 등록해주세요!", "fa-solid fa-triangle-exclamation text-rose-500");
+                return;
+            }
+
+            const newPost = {
+                userId: currentUser.uid,
+                imageUrl: selectedImageUrl,
+                caption: caption,
+                likes: [],
+                comments: [],
+                createdAt: Date.now()
+            };
+
+            if (isFirebaseAvailable) {
+                try {
+                    const postsCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'posts');
+                    await addDoc(postsCollectionRef, newPost);
+                    showToast("성공적으로 게시되었습니다!", "fa-solid fa-circle-check text-emerald-500");
+                    switchView('feed');
+                } catch (e) {
+                    console.error("Failed to add post:", e);
+                    showToast("포스트 저장에 실패했습니다.", "fa-solid fa-triangle-exclamation text-rose-500");
+                }
+            } else {
+                // Mock push
+                newPost.id = 'post-' + Math.random().toString(36).substr(2, 9);
+                mockDatabase.posts.push(newPost);
+                
+                // Refresh views manually
+                subscribeToDatabase();
+                showToast("성공적으로 게시되었습니다 (Mock Mode)!", "fa-solid fa-circle-check text-emerald-500");
+                switchView('feed');
+            }
+        });
+
+        // Like Handler
+        window.toggleLike = async function(postId) {
+            const post = allPosts.find(p => p.id === postId);
+            if (!post) return;
+
+            if (!post.likes) post.likes = [];
+            const userIndex = post.likes.indexOf(currentUser.uid);
+
+            if (userIndex > -1) {
+                post.likes.splice(userIndex, 1);
+            } else {
+                post.likes.push(currentUser.uid);
+            }
+
+            if (isFirebaseAvailable) {
+                const postDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'posts', postId);
+                await updateDoc(postDocRef, {
+                    likes: post.likes
+                });
+            } else {
+                // Mock state update
+                const postMock = mockDatabase.posts.find(p => p.id === postId);
+                if (postMock) {
+                    postMock.likes = post.likes;
+                }
+                subscribeToDatabase();
+            }
+        };
+
+        // Comments System
+        window.openCommentsDrawer = function(postId) {
+            currentEditingPostId = postId;
+            const drawer = document.getElementById('comments-drawer');
+            drawer.classList.remove('hidden');
+            
+            renderCommentsList();
+        };
+
+        window.closeCommentsDrawer = function() {
+            const drawer = document.getElementById('comments-drawer');
+            drawer.classList.add('hidden');
+            currentEditingPostId = null;
+        };
+
+        function renderCommentsList() {
+            if (!currentEditingPostId) return;
+            const post = allPosts.find(p => p.id === currentEditingPostId);
+            if (!post) return;
+
+            const listContainer = document.getElementById('drawer-comments-list');
+            const counterContainer = document.getElementById('drawer-comment-count');
+            
+            const comments = post.comments || [];
+            counterContainer.textContent = comments.length;
+            listContainer.innerHTML = '';
+
+            if (comments.length === 0) {
+                listContainer.innerHTML = `
+                    <div class="text-center py-10 text-slate-400 space-y-1">
+                        <i class="fa-regular fa-comments text-3xl mb-1 text-slate-300 dark:text-slate-800"></i>
+                        <p class="text-xs">첫 번째 댓글을 달아 분위기를 띄워보세요!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Render comments list
+            comments.forEach(comment => {
+                const cAuthor = allProfiles[comment.userId] || { displayName: comment.displayName || '익명 크루', avatarId: comment.avatarId || 'av1' };
+                const cAv = avatars.find(a => a.id === cAuthor.avatarId) || avatars[0];
+                const cTimeStr = formatTime(comment.createdAt);
+
+                const commentEl = document.createElement('div');
+                commentEl.className = "flex gap-3 items-start p-1.5 hover:bg-slate-50 dark:hover:bg-slate-900/50 rounded-xl transition-colors";
+                commentEl.innerHTML = `
+                    <div class="w-8 h-8 rounded-full bg-gradient-to-tr ${cAv.bg} flex items-center justify-center text-md flex-shrink-0 shadow-inner">
+                        ${cAv.emoji}
+                    </div>
+                    <div class="flex-1 space-y-0.5">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-slate-900 dark:text-white">${cAuthor.displayName}</span>
+                            <span class="text-[9px] text-slate-400">${cTimeStr}</span>
+                        </div>
+                        <p class="text-xs text-slate-700 dark:text-slate-300 leading-normal">${comment.text}</p>
+                    </div>
+                `;
+                listContainer.appendChild(commentEl);
+            });
+            
+            // Auto scroll to bottom
+            listContainer.scrollTop = listContainer.scrollHeight;
+        }
+
+        // Submit Comment
+        window.submitComment = async function() {
+            const input = document.getElementById('comment-input');
+            const text = input.value.trim();
+            if (!text || !currentEditingPostId) return;
+
+            const post = allPosts.find(p => p.id === currentEditingPostId);
+            if (!post) return;
+
+            if (!post.comments) post.comments = [];
+
+            const newComment = {
+                userId: currentUser.uid,
+                displayName: userProfileData.displayName,
+                avatarId: userProfileData.avatarId,
+                text: text,
+                createdAt: Date.now()
+            };
+
+            post.comments.push(newComment);
+
+            if (isFirebaseAvailable) {
+                const postDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'posts', currentEditingPostId);
+                await updateDoc(postDocRef, {
+                    comments: post.comments
+                });
+            } else {
+                // Mock Update
+                const postMock = mockDatabase.posts.find(p => p.id === currentEditingPostId);
+                if (postMock) {
+                    postMock.comments = post.comments;
+                }
+                subscribeToDatabase();
+            }
+
+            input.value = '';
+            renderCommentsList();
+            showToast("댓글이 게시되었습니다!", "fa-solid fa-comment-dots text-brand-500");
+        };
+
+        // Personal Profile Tab Renderer
+        function renderMyProfilePage() {
+            if (!userProfileData) return;
+
+            // Fill card data
+            const myAv = avatars.find(a => a.id === userProfileData.avatarId) || avatars[0];
+            const avatarContainer = document.getElementById('profile-card-avatar');
+            avatarContainer.className = `w-20 h-20 rounded-full border-4 border-white/20 bg-gradient-to-tr ${myAv.bg} flex items-center justify-center text-4xl shadow-lg`;
+            avatarContainer.innerHTML = myAv.emoji;
+
+            document.getElementById('profile-card-name').textContent = userProfileData.displayName;
+            document.getElementById('profile-card-uid').innerHTML = `<i class="fa-solid fa-copy mr-1 text-violet-400"></i> ${currentUser.uid}`;
+            document.getElementById('profile-card-uid').setAttribute('onclick', `window.copyUidToClipboard('${currentUser.uid}')`);
+
+            // Calc stats
+            const myPosts = allPosts.filter(p => p.userId === currentUser.uid);
+            document.getElementById('profile-stat-posts').textContent = myPosts.length;
+            
+            let totalReceivedLikes = 0;
+            myPosts.forEach(p => {
+                if (p.likes) totalReceivedLikes += p.likes.length;
+            });
+            document.getElementById('profile-stat-likes').textContent = totalReceivedLikes;
+
+            // Fill text fields in settings
+            document.getElementById('edit-username-input').value = userProfileData.displayName;
+
+            // Render miniature grid of personal posts
+            const gridContainer = document.getElementById('my-posts-grid');
+            gridContainer.innerHTML = '';
+
+            if (myPosts.length === 0) {
+                gridContainer.className = "block text-center py-8 text-xs text-slate-400 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-900/20";
+                gridContainer.textContent = "아직 작성하신 포스트가 없습니다.";
+                return;
+            } else {
+                gridContainer.className = "grid grid-cols-2 gap-2";
+            }
+
+            myPosts.forEach(p => {
+                const item = document.createElement('div');
+                item.className = "aspect-square rounded-xl overflow-hidden relative group cursor-pointer border border-slate-100 dark:border-slate-900";
+                item.addEventListener('click', () => {
+                    switchView('feed');
+                    // Scroll directly to that element if available
+                });
+
+                item.innerHTML = `
+                    <img src="${p.imageUrl}" class="w-full h-full object-cover" alt="Personal post preview">
+                    <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3 text-white text-xs font-semibold">
+                        <span><i class="fa-solid fa-heart mr-1 text-rose-500"></i> ${p.likes ? p.likes.length : 0}</span>
+                        <span><i class="fa-solid fa-comment mr-1"></i> ${p.comments ? p.comments.length : 0}</span>
+                    </div>
+                `;
+                gridContainer.appendChild(item);
+            });
+        }
+
+        // Initialize personal profile preferences editor
+        function initProfileEditor() {
+            renderAvatarSelector('edit-avatar-grid', userProfileData.avatarId);
+
+            document.getElementById('update-profile-btn').addEventListener('click', async () => {
+                const newName = document.getElementById('edit-username-input').value.trim();
+                if (!newName) {
+                    showToast("이름은 필수로 입력하셔야 합니다!", "fa-solid fa-circle-exclamation text-rose-500");
+                    return;
+                }
+
+                const updatedProfile = {
+                    ...userProfileData,
+                    displayName: newName,
+                    avatarId: selectedAvatarId,
+                    updatedAt: Date.now()
+                };
+
+                if (isFirebaseAvailable) {
+                    const profileRef = doc(db, 'artifacts', appId, 'public', 'data', 'profiles', currentUser.uid);
+                    await updateDoc(profileRef, {
+                        displayName: newName,
+                        avatarId: selectedAvatarId
+                    });
+                } else {
+                    mockDatabase.profiles[currentUser.uid] = updatedProfile;
+                }
+
+                userProfileData = updatedProfile;
+                onboardingCompleted();
+                showToast("프로필 업데이트가 완료되었습니다!", "fa-solid fa-user-check text-emerald-500");
+            });
+        }
+
+        // Start App Initializers on load
+        window.onload = function() {
+            setupApp();
+        };
+
+    </script>
+</body>
+</html>
